@@ -1,0 +1,150 @@
+---
+x-airflow-common:
+  &airflow-common
+  image: apache/airflow:2.8.2-python3.11
+  env_file:
+    - ${ENV_FILE_PATH:-.env}
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW__CORE__FERNET_KEY}'
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/config:/opt/airflow/config
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./data:/opt/airflow/data
+    - ./sql:/opt/airflow/sql
+    - ./jars:/opt/airflow/jars
+    - ./scripts:/opt/airflow/dags/scripts
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        #!/bin/bash
+        echo "Initializing Airflow..."
+        mkdir -p /opt/airflow/{logs,dags,plugins,config}
+        /entrypoint airflow db migrate
+        /entrypoint airflow users create \
+          --username ${AIRFLOW_ADMIN_USER} \
+          --password ${AIRFLOW_ADMIN_PASSWORD} \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com
+        chown -R "${AIRFLOW_UID}:0" /opt/airflow/
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: '${AIRFLOW_ADMIN_USER}'
+      _AIRFLOW_WWW_USER_PASSWORD: '${AIRFLOW_ADMIN_PASSWORD}'
+    user: "0:0"
+
+  airflow-apiserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8793/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  mysql:
+    image: mysql:8.0
+    container_name: staging-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_STAGING_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_STAGING_DATABASE}
+      MYSQL_USER: ${MYSQL_STAGING_USER}
+      MYSQL_PASSWORD: ${MYSQL_STAGING_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-volume:/var/lib/mysql
+      - ./sql/init_staging.sql:/docker-entrypoint-initdb.d/init_staging.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_STAGING_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  warehouse:
+    image: postgres:16
+    container_name: warehouse-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_WAREHOUSE_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_WAREHOUSE_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_WAREHOUSE_DATABASE}
+    ports:
+      - "5433:5432"
+    volumes:
+      - warehouse-volume:/var/lib/postgresql/data
+      - ./sql/init_analytics.sql:/docker-entrypoint-initdb.d/init_analytics.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_WAREHOUSE_USER}"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  postgres-db-volume:
+  mysql-volume:
+  warehouse-volume:
