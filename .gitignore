@@ -11,3 +11,5 @@ __pycache__/
 airflow/logs/
 airflow/plugins/
 airflow/config/airflow.cfg
+
+jars/
