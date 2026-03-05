@@ -1,0 +1,13 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Airflow
+airflow/logs/
+airflow/plugins/
+airflow/config/airflow.cfg
