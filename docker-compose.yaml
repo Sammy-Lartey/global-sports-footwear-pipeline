@@ -1,7 +1,8 @@
 ---
 x-airflow-common:
   &airflow-common
-  image: apache/airflow:2.8.2-python3.11
+  build: .
+  image: global-sports-footwear-airflow:latest
   env_file:
     - ${ENV_FILE_PATH:-.env}
   environment:
@@ -55,8 +56,8 @@ services:
         #!/bin/bash
         echo "Initializing Airflow..."
         mkdir -p /opt/airflow/{logs,dags,plugins,config}
-        /entrypoint airflow db migrate
-        /entrypoint airflow users create \
+        airflow db migrate
+        airflow users create \
           --username ${AIRFLOW_ADMIN_USER} \
           --password ${AIRFLOW_ADMIN_PASSWORD} \
           --firstname Admin \
