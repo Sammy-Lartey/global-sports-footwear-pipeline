@@ -36,7 +36,7 @@ def transform_data(df: pd.DataFrame) -> pd.DataFrame:
         return parts[0] + ''.join(word.capitalize() for word in parts[1:])
     
     df_transformed.columns = [to_camel_case(col) for col in df_transformed.columns]
-    logger.info(f"Converted column names to camelCase")
+    logger.info("Converted column names to camelCase")
     
     logger.info(f"Transformation complete. {len(df_transformed)} rows, {len(df_transformed.columns)} columns")
     return df_transformed

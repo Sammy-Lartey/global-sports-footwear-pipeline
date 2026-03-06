@@ -7,7 +7,6 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook # pyright: ig
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from datetime import datetime, timedelta
 import pandas as pd
-import os
 from sqlalchemy import text
 
 from scripts.config import DATA_PATH, JARS_PATH 
