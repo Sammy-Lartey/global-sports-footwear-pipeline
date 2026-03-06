@@ -12,6 +12,7 @@ __pycache__/
 airflow/logs/
 airflow/plugins/
 airflow/config/airflow.cfg
+airflow/config/
 
 # Jars
 jars/
