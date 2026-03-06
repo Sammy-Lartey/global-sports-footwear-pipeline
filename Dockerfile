@@ -12,7 +12,7 @@ COPY --from=spark /opt/spark /opt/spark
 # Set Spark and Java environment variables
 ENV SPARK_HOME=/opt/spark
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH=$PATH:$SPARK_HOME/bin:$JAVA_HOME/bin
+ENV PATH=/home/airflow/.local/bin:$PATH:$SPARK_HOME/bin:$JAVA_HOME/bin
 
 # Install system dependencies
 RUN apt-get update && \
