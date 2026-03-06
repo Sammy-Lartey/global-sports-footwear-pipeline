@@ -2,7 +2,7 @@
 FROM apache/spark:3.5.1-python3 AS spark
 
 # Stage 2: Build Airflow image
-FROM apache/airflow:2.8.1-python3.11
+FROM apache/airflow:2.8.2-python3.11
 
 USER root
 
