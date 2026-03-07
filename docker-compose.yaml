@@ -1,7 +1,10 @@
 ---
 x-airflow-common:
   &airflow-common
-  build: .
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: final
   image: global-sports-footwear-airflow:latest
   env_file:
     - ${ENV_FILE_PATH:-.env}
