@@ -18,11 +18,8 @@ ENV PATH=/home/airflow/.local/bin:$PATH:$SPARK_HOME/bin:$JAVA_HOME/bin
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     curl \
-    default-libmysqlclient-dev \
     openjdk-17-jdk \
-    procps \
-    gcc \
-    python3-dev && \
+    procps && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

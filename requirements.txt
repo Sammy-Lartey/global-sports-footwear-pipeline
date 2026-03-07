@@ -1,11 +1,14 @@
 # Core data processing
 pandas==2.0.3
-numpy==1.26.4
+numpy==1.24.3
 
 # Database
-mysqlclient==2.2.1
+PyMySQL==1.1.1
 psycopg2-binary==2.9.9
-sqlalchemy==2.0.36
+sqlalchemy==2.0.19
+
+# Utilities
+python-dotenv==1.0.0
 
 # Airflow providers 
 apache-airflow-providers-apache-spark==4.5.0
