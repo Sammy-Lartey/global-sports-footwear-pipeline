@@ -5,7 +5,7 @@ numpy==1.26.4
 # Database
 PyMySQL==1.1.1
 psycopg2-binary==2.9.9
-sqlalchemy==2.0.36
+sqlalchemy==1.4.52
 
 # Airflow providers (pinned to Airflow 2.8.x compatible versions)
 apache-airflow-providers-apache-spark==4.1.3
