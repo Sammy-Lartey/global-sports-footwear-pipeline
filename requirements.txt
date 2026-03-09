@@ -1,16 +1,16 @@
 # Core data processing
 pandas==2.0.3
-numpy==1.24.3
+numpy==1.26.4
 
 # Database
 PyMySQL==1.1.1
 psycopg2-binary==2.9.9
-sqlalchemy==2.0.19
+sqlalchemy==2.0.36
 
-# Utilities
-python-dotenv==1.0.0
-
-# Airflow providers 
-apache-airflow-providers-apache-spark==4.5.0
+# Airflow providers (pinned to Airflow 2.8.x compatible versions)
+apache-airflow-providers-apache-spark==4.1.3
 apache-airflow-providers-mysql==5.5.0
-apache-airflow-providers-postgres==5.10.0
+apache-airflow-providers-postgres==5.7.1
+
+# Prevent Airflow from being upgraded
+apache-airflow==2.8.2
