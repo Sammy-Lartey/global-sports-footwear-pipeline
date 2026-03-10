@@ -2,7 +2,7 @@
 FROM apache/spark:3.5.1-python3 AS spark
 
 # Stage 2: Build Airflow image
-FROM apache/airflow:2.8.2-python3.11 AS final
+FROM apache/airflow:3.0.0-python3.11 AS final
 
 USER root
 
@@ -44,5 +44,5 @@ RUN pip install --timeout=1200 --no-cache-dir pyspark==3.5.1
 
 # Verify installations
 RUN python -c "import pyspark; print(f' PySpark version: {pyspark.__version__}')" && \
-    python -c "import airflow; print(' Airflow installed successfully')" && \
+    python -c "import airflow; print(f' Airflow version: {airflow.__version__}')" && \
     python -c "import pandas; print(f' Pandas version: {pandas.__version__}')"

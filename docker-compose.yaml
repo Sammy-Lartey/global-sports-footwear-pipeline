@@ -61,13 +61,6 @@ services:
         mkdir -p /opt/airflow/{logs,dags,plugins,config}
         export PYTHONPATH=/home/airflow/.local/lib/python3.11/site-packages
         /home/airflow/.local/bin/airflow db migrate
-        /home/airflow/.local/bin/airflow users create \
-          --username ${AIRFLOW_ADMIN_USER} \
-          --password ${AIRFLOW_ADMIN_PASSWORD} \
-          --firstname Admin \
-          --lastname User \
-          --role Admin \
-          --email admin@example.com
         chown -R "${AIRFLOW_UID}:0" /opt/airflow/
     environment:
       <<: *airflow-common-env
