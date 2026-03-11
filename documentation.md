@@ -144,13 +144,6 @@ A `.env.example` file is included in the project root with all the required vari
 cp .env.example .env
 ```
 
-A few things worth noting as you fill it in:
-
-- **Hosts must use Docker service names** — `MYSQL_STAGING_HOST=staging-mysql` and `POSTGRES_WAREHOUSE_HOST=warehouse`, not `localhost`. Inside Docker, `localhost` refers to the container itself, not the other services.
-- **Fernet key** — Airflow uses this to encrypt sensitive data. Generate one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` and paste it into `AIRFLOW__CORE__FERNET_KEY`.
-- **Airflow connections** — the three `AIRFLOW_CONN_*` variables at the bottom auto-register the MySQL, PostgreSQL, and Spark connections on startup. No manual UI setup needed — just make sure the credentials match what you set above.
-- **Never commit `.env` to version control** — add it to your `.gitignore`.
-
 ### Step 3 — Build the custom image
 
 ```bash
