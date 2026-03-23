@@ -1,6 +1,6 @@
 from pathlib import Path
 from airflow import DAG
-from airflow.sensors.filesystem import FileSensor # pyright: ignore[reportMissingImports]
+from airflow.providers.standard.sensors.filesystem import FileSensor # pyright: ignore[reportMissingImports]
 from airflow.operators.python import PythonOperator # pyright: ignore[reportMissingImports]
 from airflow.providers.mysql.hooks.mysql import MySqlHook # pyright: ignore[reportMissingImports]
 from airflow.providers.postgres.hooks.postgres import PostgresHook # pyright: ignore[reportMissingImports]
