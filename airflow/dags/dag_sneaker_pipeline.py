@@ -35,6 +35,7 @@ def ingest_csv_to_mysql(**kwargs):
     
     print(f"Reading CSV from: {csv_path}")
     df = pd.read_csv(csv_path)
+    df['order_date'] = pd.to_datetime(df['order_date'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
     print(f"Read {len(df)} rows from CSV")
     
     engine = mysql_hook.get_sqlalchemy_engine()
