@@ -111,7 +111,7 @@ services:
       MYSQL_USER: ${MYSQL_STAGING_USER}
       MYSQL_PASSWORD: ${MYSQL_STAGING_PASSWORD}
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql-volume:/var/lib/mysql
       - ./sql/init_staging.sql:/docker-entrypoint-initdb.d/init_staging.sql
