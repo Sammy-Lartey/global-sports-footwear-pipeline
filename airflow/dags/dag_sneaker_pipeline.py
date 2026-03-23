@@ -99,7 +99,8 @@ with DAG(
     'sneaker_sales_pipeline',
     default_args=default_args,
     description='Sneaker sales ETL pipeline',
-    schedule='@daily',
+    schedule=None,
+    #schedule='@daily'
     catchup=False,
 ) as dag:
 
