@@ -7,8 +7,8 @@ PyMySQL==1.1.1
 psycopg2-binary==2.9.9
 sqlalchemy==2.0.36
 
-# Airflow providers - compatible with Airflow 3.x
-apache-airflow-providers-apache-spark==4.10.0
-apache-airflow-providers-mysql==6.5.0
-apache-airflow-providers-postgres==5.13.0
-apache-airflow-providers-common-sql==1.21.0
+# Airflow providers - let pip resolve compatible versions
+apache-airflow-providers-apache-spark
+apache-airflow-providers-mysql
+apache-airflow-providers-postgres
+apache-airflow-providers-common-sql
