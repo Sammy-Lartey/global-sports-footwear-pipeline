@@ -70,6 +70,9 @@ def validate_and_transform_data(**kwargs):
     
     # Write to silver table
     mysql_hook.run("TRUNCATE TABLE sports_footwear_sales_clean")
+    # Drop columns not in the silver schema
+    cols_to_drop = [c for c in ['ingestionTimestamp', 'ingestion_timestamp'] if c in df_silver.columns]
+    df_silver = df_silver.drop(columns=cols_to_drop)
     df_silver.to_sql('sports_footwear_sales_clean', con=engine, if_exists='append', index=False)
     print(f"Wrote {len(df_silver)} rows to silver table")
 
