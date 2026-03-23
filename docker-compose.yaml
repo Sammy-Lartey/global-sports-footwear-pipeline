@@ -27,7 +27,6 @@ x-airflow-common:
     - ./data:/opt/airflow/data
     - ./sql:/opt/airflow/sql
     - ./jars:/opt/airflow/jars
-    - ./scripts:/opt/airflow/dags/scripts
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
