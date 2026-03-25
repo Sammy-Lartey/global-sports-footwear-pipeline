@@ -35,8 +35,8 @@ def transform_data(df: pd.DataFrame) -> pd.DataFrame:
     if 'order_date' in df_transformed.columns:
         df_transformed['order_date'] = pd.to_datetime(df_transformed['order_date'], errors='coerce')
         df_transformed['year'] = df_transformed['order_date'].dt.year
-        df_transformed['month'] = df_transformed['order_date'].dt.month  # INT
-        df_transformed['day_of_week'] = df_transformed['order_date'].dt.dayofweek  # INT 0=Monday
+        df_transformed['month'] = df_transformed['order_date'].dt.strftime('%B')  # e.g. January
+        df_transformed['day_of_week'] = df_transformed['order_date'].dt.strftime('%A')  # e.g. Monday
         logger.info("Added date features (year, month, day_of_week)")
     
     # 5. Discount amount

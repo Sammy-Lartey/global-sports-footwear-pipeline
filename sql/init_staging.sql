@@ -46,8 +46,8 @@ CREATE TABLE sports_footwear_sales_clean (
     customerIncomeLevel VARCHAR(50),
     customerRating DECIMAL(3, 2),
     year INT,
-    month INT,
-    dayOfWeek INT,
+    month VARCHAR(20),
+    dayOfWeek VARCHAR(20),
     discountAmount DECIMAL(15, 4),
     validationTimestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
