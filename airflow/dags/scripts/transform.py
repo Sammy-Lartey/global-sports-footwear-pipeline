@@ -86,7 +86,8 @@ def transform_data(df: pd.DataFrame) -> pd.DataFrame:
         parts = col_name.split('_')
         return parts[0] + ''.join(word.capitalize() for word in parts[1:])
     
-    logger.info("Keeping snake_case column names for database compatibility")
+    df_transformed.columns = [to_camel_case(col) for col in df_transformed.columns]
+    logger.info("Converted column names to camelCase")
     
     
     # 7. Final logging
