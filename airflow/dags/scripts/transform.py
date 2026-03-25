@@ -54,22 +54,21 @@ def transform_data(df: pd.DataFrame) -> pd.DataFrame:
     # - Converts to datetime safely
     # - Adds STRING + NUMERIC versions
     
+    # -------------------------------
+# 4. Date handling + features (SIMPLIFIED)
+# - Converts to datetime safely
+# - Adds ONLY string features (as requested)
+# -------------------------------
     if 'order_date' in df_transformed.columns:
-        # FIX: prevent crashes from bad date formats
         df_transformed['order_date'] = pd.to_datetime(
             df_transformed['order_date'], errors='coerce'
         )
         
-        # Numeric (for sorting)
         df_transformed['year'] = df_transformed['order_date'].dt.year
-        df_transformed['month_num'] = df_transformed['order_date'].dt.month
-        df_transformed['day_of_week_num'] = df_transformed['order_date'].dt.dayofweek
-        
-        # String (for display)
         df_transformed['month'] = df_transformed['order_date'].dt.month_name()
         df_transformed['day_of_week'] = df_transformed['order_date'].dt.day_name()
         
-        logger.info("Added date features (string + numeric)")
+        logger.info("Added date features (year, month, day_of_week)")
     
     
     # 5. Discount amount
@@ -87,8 +86,7 @@ def transform_data(df: pd.DataFrame) -> pd.DataFrame:
         parts = col_name.split('_')
         return parts[0] + ''.join(word.capitalize() for word in parts[1:])
     
-    df_transformed.columns = [to_camel_case(col) for col in df_transformed.columns]
-    logger.info("Converted column names to camelCase")
+    logger.info("Keeping snake_case column names for database compatibility")
     
     
     # 7. Final logging
