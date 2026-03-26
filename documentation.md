@@ -72,14 +72,14 @@ CSV File
 | `airflow-scheduler` | Custom (see Dockerfile) | DAG scheduling | — |
 | `airflow-init` | Custom (see Dockerfile) | One-time DB init | — |
 | `postgres` | postgres:16 | Airflow metadata DB | 5432 (internal) |
-| `mysql` | mysql:8.0 | Bronze + Silver layers | 3306 |
+| `mysql` | mysql:8.0 | Bronze + Silver layers | 3307 |
 | `warehouse` | postgres:16 | Gold layer / analytics | 5433 |
 
 ### Custom Airflow Image
 
 The stock Airflow image doesn't include Java or Spark. The `Dockerfile` does a two-stage build:
 - **Stage 1:** Pulls Spark 3.5.1 from `apache/spark:3.5.1-python3`
-- **Stage 2:** Copies Spark into the Airflow 2.8.1 image, installs OpenJDK 17, and installs Python dependencies
+- **Stage 2:** Copies Spark into the Airflow 3.1.8 image, installs OpenJDK 17, and installs Python dependencies
 
 ---
 
@@ -118,7 +118,7 @@ project-root/
 └── .env
 ```
 
-> **Note:** `scripts/` lives inside `airflow/dags/` so that the single volume mount `./airflow/dags:/opt/airflow/dags` covers the DAG, the Spark script, and the scripts package all at once. This is also why `from scripts.config import ...` resolves correctly — Airflow's working directory is `/opt/airflow/dags/`.
+> **Note:** `scripts/` lives inside `airflow/dags/` so that the single volume mount `./airflow/dags:/opt/airflow/dags` covers the DAG, the Spark script, and the scripts package all at once.
 
 ---
 
@@ -138,8 +138,6 @@ Ensure your project folder matches the structure in [Section 3](#3-project-struc
 
 ### Step 2 — Configure the `.env` file
 
-A `.env.example` file is included in the project root with all the required variables and placeholder values. Copy it and fill in your own values:
-
 ```bash
 cp .env.example .env
 ```
@@ -150,55 +148,60 @@ cp .env.example .env
 docker compose build
 ```
 
-This builds the custom Airflow+Spark image. Only needed on first run or after changes to `Dockerfile` or `requirements.txt`.
-
 ### Step 4 — Initialise Airflow
 
 ```bash
 docker compose up airflow-init
 ```
 
-This runs once to migrate the Airflow metadata DB and create the admin user. Wait for it to complete (exit code 0) before the next step.
+Wait for `Database migrating done!` before proceeding.
 
 ### Step 5 — Start all services
-
-```bash
-docker compose up
-```
-
-Or to run in the background:
 
 ```bash
 docker compose up -d
 ```
 
-### Step 6 — Access the Airflow UI
+### Step 6 — Get the admin password
 
-Go to `http://localhost:8080` and log in with the credentials from your `.env` (`airflow` / `airflow` by default).
+Airflow 3.x auto-generates an admin password on first start. Retrieve it with:
 
-### Step 7 — Run the pipeline
+```bash
+docker compose logs airflow-apiserver | findstr "Password"
+```
 
-1. Find the `sneaker_sales_pipeline` DAG in the UI
+Go to `http://localhost:8080` and log in with username `admin` and the generated password.
+
+### Step 7 — Create the fs_default connection
+
+Before running the pipeline, create the filesystem connection in the Airflow UI:
+
+1. Go to **Admin → Connections**
+2. Click **+**
+3. Fill in:
+   - **Connection Id:** `fs_default`
+   - **Connection Type:** `File(path)`
+   - **Path:** `/`
+4. Click **Save**
+
+### Step 8 — Run the pipeline
+
+1. Find the `sneaker_sales_pipeline` DAG
 2. Toggle it from paused to active
-3. Click **Trigger DAG** to run it manually
+3. Click **Trigger DAG**
 
 ### Stopping everything
 
 ```bash
-docker compose down
-```
-
-To also wipe all database volumes (full reset):
-
-```bash
-docker compose down -v
+docker compose down       # stop containers
+docker compose down -v    # full reset including DB volumes
 ```
 
 ---
 
 ## 5. Pipeline Walkthrough
 
-The DAG is defined in `dag_sneaker_pipeline.py` and runs on a `@daily` schedule. It has five tasks executed sequentially:
+The DAG is defined in `dag_sneaker_pipeline.py` and is set to manual trigger (`schedule=None`). Five tasks run sequentially:
 
 ```
 wait_for_csv >> ingest_csv_to_mysql >> validate_and_transform_data >> load_to_postgres >> compute_gold_kpis
@@ -208,38 +211,31 @@ wait_for_csv >> ingest_csv_to_mysql >> validate_and_transform_data >> load_to_po
 
 ### Task 1 — `wait_for_csv` (FileSensor)
 
-Polls for the CSV file at the configured `DATA_PATH` every 30 seconds, timing out after 10 minutes. The pipeline won't proceed until the file is present.
+Polls for the CSV file every 30 seconds, timing out after 10 minutes.
 
-- **Operator:** `FileSensor`
+- **Operator:** `airflow.providers.standard.sensors.filesystem.FileSensor`
 - **Polls:** `/opt/airflow/data/global_sports_footwear_sales_2018_2026.csv`
-- **Poke interval:** 30s
-- **Timeout:** 600s
+- **Requires:** `fs_default` connection
 
 ---
 
 ### Task 2 — `ingest_csv_to_mysql` (PythonOperator)
 
-Reads the raw CSV with pandas and loads it into the MySQL bronze table with no transformations at all — data goes in exactly as it is.
+Reads the raw CSV and loads it into the MySQL bronze table with no transformations.
 
 - **Reads from:** CSV file via pandas
 - **Writes to:** `sports_footwear_sales_raw` (MySQL)
-- **Strategy:** Truncate then append on every run (idempotent)
-- **Connection:** `mysql_staging`
-
-**What happens:**
-1. `pd.read_csv()` reads all 30,000 rows
-2. `TRUNCATE TABLE sports_footwear_sales_raw` clears any previous data
-3. `df.to_sql(..., if_exists='append')` loads the fresh data
+- **Strategy:** Truncate then append (idempotent)
+- **Note:** Parses `DD/MM/YYYY` dates to `YYYY-MM-DD` before loading
 
 ---
 
 ### Task 3 — `validate_and_transform_data` (PythonOperator)
 
-Reads from the bronze table, runs validation and transformation logic defined in `scripts/validate.py` and `scripts/transform.py`, and writes the cleaned result to the MySQL silver table.
+Validates and transforms the bronze data, writes the clean result to the silver table.
 
 - **Reads from:** `sports_footwear_sales_raw` (MySQL)
 - **Writes to:** `sports_footwear_sales_clean` (MySQL)
-- **Connection:** `mysql_staging`
 
 #### Validation (`validate.py`)
 
@@ -247,9 +243,8 @@ Reads from the bronze table, runs validation and transformation logic defined in
 |---|---|
 | Duplicate `order_id` | Drop duplicates, keep first |
 | Missing `order_id`, `brand`, or `units_sold` | Drop the row |
-| Non-numeric values in numeric columns | Coerce to NaN, drop rows where `units_sold` or `base_price_usd` is NaN |
+| Non-numeric values in numeric columns | Coerce, drop rows where critical columns are NaN |
 | `discount_percent` outside 0–100 | Drop the row |
-| `order_date` | Parse with `pd.to_datetime()` |
 
 #### Transformation (`transform.py`)
 
@@ -257,108 +252,68 @@ Reads from the bronze table, runs validation and transformation logic defined in
 |---|---|
 | Recalculate `final_price_usd` | `base_price_usd * (1 - discount_percent / 100)` |
 | Recalculate `revenue_usd` | `final_price_usd * units_sold` |
-| Add `year`, `month`, `day_of_week` | Extracted from `order_date` |
+| Add `year` | Integer year extracted from `order_date` |
+| Add `month` | Full month name e.g. `January` |
+| Add `day_of_week` | Full day name e.g. `Monday` |
 | Add `discount_amount` | `base_price_usd * (discount_percent / 100)` |
-| Rename all columns | Snake_case → camelCase (e.g. `order_id` → `orderId`) |
-
-> **Why camelCase?** The silver MySQL table schema uses camelCase column names. The conversion is done in `transform.py` before writing, so the column names match the table definition exactly.
+| Rename all columns | snake_case → camelCase |
 
 ---
 
 ### Task 4 — `load_to_postgres` (PythonOperator)
 
-Copies the full silver dataset from MySQL across to PostgreSQL, staging it for the Spark KPI job.
+Copies the full silver dataset from MySQL to PostgreSQL staging.
 
 - **Reads from:** `sports_footwear_sales_clean` (MySQL)
 - **Writes to:** `sports_footwear_sales_staging` (PostgreSQL)
-- **Strategy:** `if_exists='replace'` — drops and recreates the staging table on every run
-- **Connections:** `mysql_staging`, `postgres_warehouse`
+- **Strategy:** `if_exists='replace'`
 
 ---
 
 ### Task 5 — `compute_gold_kpis` (SparkSubmitOperator)
 
-Submits `spark_compute_kpis.py` as a Spark job. Spark reads the silver data directly from MySQL via JDBC and writes five KPI aggregations to the PostgreSQL `analytics` schema.
-
-- **Reads from:** `sports_footwear_sales_clean` (MySQL, via JDBC)
-- **Writes to:** `analytics.*` tables (PostgreSQL, via JDBC)
-- **Connection:** `spark_default` (local mode)
-- **JARs:** MySQL + PostgreSQL JDBC drivers
+Submits `spark_compute_kpis.py` as a Spark job that reads from MySQL via JDBC and writes five KPI tables to PostgreSQL.
 
 #### KPIs Computed
 
 | Table | Group By | Metrics |
 |---|---|---|
-| `gold_brand_performance` | `brand` | Total revenue, total units, total orders, avg rating |
-| `gold_monthly_sales` | `year`, `month` | Total revenue, total units, total orders |
-| `gold_channel_performance` | `salesChannel` | Total revenue, total orders, avg units per order |
-| `gold_country_performance` | `country` | Total revenue, total orders |
-| `gold_overall_metrics` | — (single row) | Total revenue, total units, total orders, avg rating |
-
-All tables are written with `mode("overwrite")` and `truncate=true`, so they're fully refreshed on every pipeline run.
+| `gold_brand_performance` | `brand` | Total revenue, units, orders, avg rating |
+| `gold_monthly_sales` | `year`, `month` | Total revenue, units, orders |
+| `gold_channel_performance` | `salesChannel` | Total revenue, orders, avg units per order |
+| `gold_country_performance` | `country` | Total revenue, orders |
+| `gold_overall_metrics` | — (single row) | Total revenue, units, orders, avg rating |
 
 ---
 
 ## 6. Data Dictionary
 
-### Source CSV — `global_sports_footwear_sales_2018_2026.csv`
+### Source CSV
 
-| Column | Type | Description | Example |
-|---|---|---|---|
-| `order_id` | string | Unique order identifier | `ORD100000` |
-| `order_date` | string (DD/MM/YYYY) | Date the order was placed | `30/01/2021` |
-| `brand` | string | Sneaker brand | `Nike`, `Adidas`, `ASICS` |
-| `model_name` | string | Product model name | `Model-370` |
-| `category` | string | Product category | `Running`, `Lifestyle`, `Basketball`, `Training`, `Gym` |
-| `gender` | string | Target gender | `Men`, `Women`, `Unisex` |
-| `size` | integer | Shoe size | `8` |
-| `color` | string | Shoe colour | `Black`, `White`, `Grey` |
-| `base_price_usd` | integer | List price before discount | `162` |
-| `discount_percent` | integer | Discount applied (0–30%) | `15` |
-| `final_price_usd` | float | Price after discount | `137.70` |
-| `units_sold` | integer | Number of units in order (1–4) | `1` |
-| `revenue_usd` | float | `final_price_usd * units_sold` | `137.70` |
-| `payment_method` | string | How the order was paid | `Card`, `Cash` |
-| `sales_channel` | string | Where the sale occurred | `Retail Store`, `Online` |
-| `country` | string | Country of sale | `USA`, `Germany`, `India`, `UK`, `UAE`, `Pakistan` |
-| `customer_income_level` | string | Customer income bracket | `Low`, `Medium`, `High` |
-| `customer_rating` | float | Customer satisfaction rating (3.0–5.0) | `4.6` |
-
----
-
-### MySQL Bronze — `sports_footwear_sales_raw`
-
-Mirrors the CSV schema exactly. All columns use snake_case. No primary key — intentionally raw.
-
-| Column | MySQL Type |
-|---|---|
-| `order_id` | VARCHAR(255) |
-| `order_date` | DATE |
-| `brand` | VARCHAR(255) |
-| `model_name` | VARCHAR(255) |
-| `category` | VARCHAR(255) |
-| `gender` | VARCHAR(50) |
-| `size` | DECIMAL(5,2) |
-| `color` | VARCHAR(50) |
-| `base_price_usd` | DECIMAL(15,4) |
-| `discount_percent` | DECIMAL(5,2) |
-| `final_price_usd` | DECIMAL(15,4) |
-| `units_sold` | INT |
-| `revenue_usd` | DECIMAL(15,4) |
-| `payment_method` | VARCHAR(50) |
-| `sales_channel` | VARCHAR(50) |
-| `country` | VARCHAR(100) |
-| `customer_income_level` | VARCHAR(50) |
-| `customer_rating` | DECIMAL(3,2) |
-| `ingestion_timestamp` | TIMESTAMP |
-
----
+| Column | Type | Description |
+|---|---|---|
+| `order_id` | string | Unique order identifier |
+| `order_date` | string (DD/MM/YYYY) | Date the order was placed |
+| `brand` | string | Sneaker brand |
+| `model_name` | string | Product model name |
+| `category` | string | Running, Lifestyle, Basketball, Training, Gym |
+| `gender` | string | Men, Women, Unisex |
+| `size` | integer | Shoe size |
+| `color` | string | Shoe colour |
+| `base_price_usd` | integer | List price before discount |
+| `discount_percent` | integer | Discount applied (0–30%) |
+| `final_price_usd` | float | Price after discount |
+| `units_sold` | integer | Units in order (1–4) |
+| `revenue_usd` | float | `final_price_usd * units_sold` |
+| `payment_method` | string | Card, Cash, Wallet, Bank Transfer |
+| `sales_channel` | string | Retail Store, Online |
+| `country` | string | USA, Germany, India, UK, UAE, Pakistan |
+| `customer_income_level` | string | Low, Medium, High |
+| `customer_rating` | float | Rating 3.0–5.0 |
 
 ### MySQL Silver — `sports_footwear_sales_clean`
 
-Validated, transformed, camelCase columns. `orderId` is the primary key. Adds derived date and pricing columns.
-
-| Column | MySQL Type | Notes |
+| Column | Type | Notes |
 |---|---|---|
 | `orderId` | VARCHAR(255) PK | |
 | `orderDate` | DATE | |
@@ -370,68 +325,25 @@ Validated, transformed, camelCase columns. `orderId` is the primary key. Adds de
 | `color` | VARCHAR(50) | |
 | `basePriceUsd` | DECIMAL(15,4) | |
 | `discountPercent` | DECIMAL(5,2) | |
-| `finalPriceUsd` | DECIMAL(15,4) | Recalculated in transform |
+| `finalPriceUsd` | DECIMAL(15,4) | Recalculated |
 | `unitsSold` | INT | |
-| `revenueUsd` | DECIMAL(15,4) | Recalculated in transform |
+| `revenueUsd` | DECIMAL(15,4) | Recalculated |
 | `paymentMethod` | VARCHAR(50) | |
 | `salesChannel` | VARCHAR(50) | |
 | `country` | VARCHAR(100) | |
 | `customerIncomeLevel` | VARCHAR(50) | |
 | `customerRating` | DECIMAL(3,2) | |
-| `year` | INT | Derived from `orderDate` |
-| `month` | INT | Derived from `orderDate` |
-| `dayOfWeek` | INT | 0=Monday, 6=Sunday |
-| `discountAmount` | DECIMAL(15,4) | `basePriceUsd * discountPercent / 100` |
-
----
+| `year` | INT | |
+| `month` | VARCHAR(20) | e.g. January |
+| `dayOfWeek` | VARCHAR(20) | e.g. Monday |
+| `discountAmount` | DECIMAL(15,4) | |
 
 ### PostgreSQL Gold — `analytics` schema
 
-All tables are in the `analytics` schema and fully overwritten on every pipeline run.
+All tables fully overwritten on every pipeline run.
 
-**`gold_brand_performance`**
-
-| Column | Type | Description |
-|---|---|---|
-| `brand` | VARCHAR(255) PK | |
-| `total_revenue_usd` | DECIMAL(20,4) | |
-| `total_units_sold` | BIGINT | |
-| `total_orders` | BIGINT | |
-| `avg_customer_rating` | DECIMAL(3,2) | |
-
-**`gold_monthly_sales`**
-
-| Column | Type | Description |
-|---|---|---|
-| `year` | INT PK | |
-| `month` | INT PK | |
-| `total_revenue_usd` | DECIMAL(20,4) | |
-| `total_units_sold` | BIGINT | |
-| `total_orders` | BIGINT | |
-
-**`gold_channel_performance`**
-
-| Column | Type | Description |
-|---|---|---|
-| `salesChannel` | VARCHAR(50) PK | |
-| `total_revenue_usd` | DECIMAL(20,4) | |
-| `total_orders` | BIGINT | |
-| `avg_units_per_order` | DECIMAL(10,4) | |
-
-**`gold_country_performance`**
-
-| Column | Type | Description |
-|---|---|---|
-| `country` | VARCHAR(100) PK | |
-| `total_revenue_usd` | DECIMAL(20,4) | |
-| `total_orders` | BIGINT | |
-
-**`gold_overall_metrics`**
-
-| Column | Type | Description |
-|---|---|---|
-| `id` | INT PK DEFAULT 1 | Always 1 — single row table |
-| `total_revenue_usd` | DECIMAL(20,4) | |
-| `total_units_sold` | BIGINT | |
-| `total_orders` | BIGINT | |
-| `avg_customer_rating` | DECIMAL(3,2) | |
+**`gold_brand_performance`** — grouped by `brand`
+**`gold_monthly_sales`** — grouped by `year`, `month`
+**`gold_channel_performance`** — grouped by `salesChannel`
+**`gold_country_performance`** — grouped by `country`
+**`gold_overall_metrics`** — single row summary

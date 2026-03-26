@@ -8,7 +8,7 @@ End-to-end ETL pipeline using Apache Airflow to process and analyze global sport
 
 | Tool | Purpose |
 |---|---|
-| Apache Airflow 2.8.1 | Orchestration |
+| Apache Airflow 3.1.8 | Orchestration |
 | Apache Spark 3.5.1 | KPI computation |
 | MySQL 8.0 | Bronze + Silver layers |
 | PostgreSQL 16 | Gold layer / data warehouse |
@@ -46,10 +46,21 @@ docker compose build
 docker compose up airflow-init
 
 # 5. Start all services
-docker compose up
+docker compose up -d
 ```
 
-Then go to `http://localhost:8080`, log in with your credentials, unpause the `sneaker_sales_pipeline` DAG and trigger it.
+Then go to `http://localhost:8080`. Airflow 3.x auto-generates an admin password — check the logs for it:
+
+```bash
+docker compose logs airflow-apiserver | findstr "Password"
+```
+
+Log in, find the `sneaker_sales_pipeline` DAG, toggle it on and trigger it manually.
+
+> **Note:** Before triggering, create the `fs_default` connection in the Airflow UI under Admin → Connections:
+> - **Connection Id:** `fs_default`
+> - **Connection Type:** `File(path)`
+> - **Path:** `/`
 
 ---
 
@@ -127,6 +138,10 @@ docker compose down -v
 
 # Rebuild image after code changes
 docker compose build --no-cache
+
+# Check logs
+docker compose logs airflow-apiserver
+docker compose logs airflow-scheduler
 ```
 
 ---
