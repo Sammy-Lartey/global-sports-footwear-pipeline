@@ -1,5 +1,6 @@
 -- Drop tables if they exist
 DROP TABLE IF EXISTS sports_footwear_sales_clean;
+DROP TABLE IF EXISTS sports_footwear_sales_rejected;
 DROP TABLE IF EXISTS sports_footwear_sales_raw;
 
 -- Create raw table (Bronze layer)
@@ -55,3 +56,29 @@ CREATE TABLE sports_footwear_sales_clean (
 -- Add some indexes for better performance
 CREATE INDEX idx_brand ON sports_footwear_sales_clean(brand);
 CREATE INDEX idx_orderdate ON sports_footwear_sales_clean(orderDate);
+-- Create dead letter queue table (rejected rows)
+CREATE TABLE sports_footwear_sales_rejected (
+    order_id VARCHAR(255),
+    order_date DATE,
+    brand VARCHAR(255),
+    model_name VARCHAR(255),
+    category VARCHAR(255),
+    gender VARCHAR(50),
+    size DECIMAL(5, 2),
+    color VARCHAR(50),
+    base_price_usd DECIMAL(15, 4),
+    discount_percent DECIMAL(5, 2),
+    final_price_usd DECIMAL(15, 4),
+    units_sold VARCHAR(50),
+    revenue_usd DECIMAL(15, 4),
+    payment_method VARCHAR(50),
+    sales_channel VARCHAR(50),
+    country VARCHAR(100),
+    customer_income_level VARCHAR(50),
+    customer_rating DECIMAL(3, 2),
+    rejection_reason VARCHAR(255),
+    rejected_at TIMESTAMP
+);
+
+CREATE INDEX idx_rejected_reason ON sports_footwear_sales_rejected(rejection_reason);
+CREATE INDEX idx_rejected_at ON sports_footwear_sales_rejected(rejected_at);

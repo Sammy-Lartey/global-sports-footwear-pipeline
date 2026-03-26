@@ -62,12 +62,23 @@ def validate_and_transform_data(**kwargs):
     
     # Validate
     print("Validating data...")
-    df_validated = validate_data(df)
-    
+    df_validated, df_rejected = validate_data(df)
+
+    # Write rejected rows to dead letter queue
+    if not df_rejected.empty:
+        # Keep only original columns + rejection metadata
+        original_cols = [c for c in df.columns if c in df_rejected.columns]
+        dlq_cols = original_cols + ['rejection_reason', 'rejected_at']
+        df_dlq = df_rejected[[c for c in dlq_cols if c in df_rejected.columns]]
+        df_dlq.to_sql('sports_footwear_sales_rejected', con=engine, if_exists='append', index=False)
+        print(f"Wrote {len(df_dlq)} rejected rows to dead letter queue")
+    else:
+        print("No rejected rows")
+
     # Transform
     print("Transforming data...")
     df_silver = transform_data(df_validated)
-    
+
     # Write to silver table
     mysql_hook.run("TRUNCATE TABLE sports_footwear_sales_clean")
     # Drop columns not in the silver schema
