@@ -14,7 +14,7 @@ CREATE TABLE analytics.gold_brand_performance (
 -- 2. Monthly sales
 CREATE TABLE analytics.gold_monthly_sales (
     year INT,
-    month INT,
+    month VARCHAR(20),
     total_revenue_usd DECIMAL(20, 4),
     total_units_sold BIGINT,
     total_orders BIGINT,
