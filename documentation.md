@@ -246,6 +246,8 @@ Validates and transforms the bronze data, writes the clean result to the silver 
 | Non-numeric values in numeric columns | Coerce, drop rows where critical columns are NaN |
 | `discount_percent` outside 0–100 | Drop the row |
 
+Invalid rows are not silently discarded — they are written to a **dead letter queue** table (`sports_footwear_sales_rejected`) in MySQL with a `rejection_reason` and `rejected_at` timestamp. This provides a full audit trail of data quality issues for investigation and reprocessing.
+
 #### Transformation (`transform.py`)
 
 | Step | Detail |
@@ -310,6 +312,16 @@ Submits `spark_compute_kpis.py` as a Spark job that reads from MySQL via JDBC an
 | `country` | string | USA, Germany, India, UK, UAE, Pakistan |
 | `customer_income_level` | string | Low, Medium, High |
 | `customer_rating` | float | Rating 3.0–5.0 |
+
+### MySQL Dead Letter Queue — `sports_footwear_sales_rejected`
+
+Rows that fail validation are written here instead of being silently dropped. Mirrors the raw table schema with two additional columns:
+
+| Column | Type | Description |
+|---|---|---|
+| *(all raw columns)* | — | Original values as received |
+| `rejection_reason` | VARCHAR(255) | Why the row was rejected e.g. `duplicate order_id`, `missing brand` |
+| `rejected_at` | TIMESTAMP | When the row was rejected |
 
 ### MySQL Silver — `sports_footwear_sales_clean`
 
