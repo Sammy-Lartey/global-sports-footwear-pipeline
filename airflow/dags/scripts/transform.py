@@ -31,12 +31,12 @@ def transform_data(df: pd.DataFrame) -> pd.DataFrame:
         df_transformed['revenue_usd'] = df_transformed['final_price_usd'] * df_transformed['units_sold']
         logger.info("Recalculated revenue_usd")
     
-    # 4. Date handling + features (keep integers)
+    # 4. Date handling + features
     if 'order_date' in df_transformed.columns:
         df_transformed['order_date'] = pd.to_datetime(df_transformed['order_date'], errors='coerce')
         df_transformed['year'] = df_transformed['order_date'].dt.year
-        df_transformed['month'] = df_transformed['order_date'].dt.strftime('%B')  # e.g. January
-        df_transformed['day_of_week'] = df_transformed['order_date'].dt.strftime('%A')  # e.g. Monday
+        df_transformed['month'] = df_transformed['order_date'].dt.strftime('%B')  
+        df_transformed['day_of_week'] = df_transformed['order_date'].dt.strftime('%A')
         logger.info("Added date features (year, month, day_of_week)")
     
     # 5. Discount amount
