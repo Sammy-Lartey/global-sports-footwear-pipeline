@@ -6,11 +6,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def validate_data(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Validates the dataframe and returns two dataframes:
-    - df_valid: rows that passed all checks
-    - df_rejected: rows that failed, with rejection_reason and rejected_at columns
-    """
+    
+    # Validates the dataframe and returns two dataframes:
+    # - df_valid: rows that passed all checks
+    # - df_rejected: rows that failed, with rejection_reason and rejected_at columns
+
     logger.info(f"Starting validation on {len(df)} rows")
 
     df_clean = df.copy()
